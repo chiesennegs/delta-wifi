@@ -1,91 +1,196 @@
 # delta-wifi
 
-A macOS CLI for monitoring and recovering Delta inflight Wi-Fi. Login, retries, provider-policy checks, internet checks, and device logout use HTTP by default. No browser is launched unless you explicitly select browser mode or open the portal manually.
+## Summary
 
-## Homebrew distribution
+**Spend less time wrestling with Delta Wi-Fi login.** `delta-wifi` is a macOS command-line tool that logs in with your SkyMiles account, retries temporary failures, and shows three distinct states: connection to the Wi-Fi network, the device's onboard access session, and actual internet connectivity.
 
-The first Homebrew pre-release is available:
+The default mode uses HTTP directly, so it does not launch a browser. Passwords stay in macOS Keychain. Monitoring can wait for Delta Wi-Fi, recover when login is needed, and preserve an active session when the aircraft's internet connection is the problem.
+
+The [first Homebrew pre-release](https://github.com/chiesennegs/delta-wifi/releases/tag/v0.3.0) is available for Apple Silicon and Intel Macs. This is an independent tool, not an official Delta product. It cannot repair an aircraft's upstream connection.
+
+## Basic Usage
+
+After [installing](#install), join **DeltaWiFi.com** using the macOS Wi-Fi menu, then:
+
+```sh
+# One-time permission to read the Wi-Fi network name.
+delta-wifi wifi-perms
+
+# One-time credential setup; prompts privately for your password.
+delta-wifi credentials YOUR_SKYMILES_NUMBER_OR_USERNAME
+
+# Log in now, without opening a browser.
+delta-wifi login
+
+# Keep checking and recover when login is needed. Ctrl+C stops it.
+delta-wifi watch --auto-login
+```
+
+When macOS prompts, allow **Delta WiFi Helper** to use Location Services. macOS requires that permission to expose the connected network name; the helper does not request geographic coordinates.
+
+Already saved credentials with an earlier version? Select that Keychain entry instead of entering the password again:
+
+```sh
+delta-wifi account use YOUR_SKYMILES_NUMBER_OR_USERNAME
+```
+
+Use `delta-wifi status` for a single connection snapshot. Use `delta-wifi --help` or `delta-wifi COMMAND --help` for command descriptions, options, and examples.
+
+## Install
+
+### Homebrew (recommended)
 
 ```sh
 brew install chiesennegs/tap/delta-wifi
+delta-wifi --version
+```
+
+Homebrew manages Python and its isolated environment. Native helpers are precompiled for Apple Silicon and Intel; you do not need to activate a venv or compile Swift on first use. The package installs the HTTP core; [browser mode](#optional-browser-mode) is an optional Python extra.
+
+If migrating from an active development venv, run `deactivate` first. Your existing Keychain credentials, account preference, and history remain separate from the Homebrew installation. Run `delta-wifi wifi-perms` once after installation to authorize the installed helper.
+
+To upgrade:
+
+```sh
 brew update
 brew upgrade delta-wifi
 ```
 
-This installs the HTTP core and precompiled native helpers without manual venv activation. If migrating from an active development venv, run `deactivate` first, then run `delta-wifi wifi-perms` once after installing. See [the publishing guide](packaging/HOMEBREW.md) for repository setup, draft-release review, tap updates, signing status, and maintenance. The initial prebuilt helpers have development signatures; stable Developer ID signing/notarization is not yet configured.
+The initial helpers use development signatures. Developer ID signing/notarization is not yet configured, so an upgrade may require reauthorizing Location Services or notifications.
 
-## Setup from source
+### From Source
 
-Requires Python 3.10+ and macOS. Default HTTP mode uses only Python's standard library.
+Requires macOS, Python 3.10+, Git, and Apple Command Line Tools for building the native helpers. Default HTTP mode uses only Python's standard library.
 
 ```sh
+git clone https://github.com/chiesennegs/delta-wifi.git
+cd delta-wifi
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -e .
-delta-wifi wifi-perms
-delta-wifi credentials YOUR_ACCOUNT
-delta-wifi watch --auto-login
 ```
 
-Allow **Delta WiFi Helper** to use Location Services when prompted. Apple gates SSID access behind this permission; geographic coordinates are not requested. If denied, enable it in System Settings > Privacy & Security > Location Services. Source installations build the native helper on first use, requiring Apple Command Line Tools. Homebrew installations use precompiled helpers. Keep it in its generated location; rebuilding or moving it may require authorization again. It is separate from browser automation.
-
-An editable installation picks up changes immediately. To select credentials saved by an older version without re-entering the password:
+Continue with [Basic Usage](#basic-usage). An editable installation picks up source changes immediately. To update a source installation:
 
 ```sh
-delta-wifi account use YOUR_ACCOUNT
+git pull --ff-only
+python -m pip install -e .
 ```
 
-## Browser-free login and recovery
+For source installs, the Wi-Fi and notification helpers build on first permission setup. Keep them in their generated locations; rebuilding or moving them may require authorization again.
+
+## Examples
+
+### Check, log in, or monitor
 
 ```sh
-delta-wifi login
-delta-wifi login YOUR_ACCOUNT
-delta-wifi watch --auto-login
-delta-wifi watch --auto-login YOUR_ACCOUNT --max-attempts 3 --retry-delay 30
+delta-wifi status                        # One snapshot.
+delta-wifi login                         # Use the preferred saved account.
+delta-wifi login OTHER_ACCOUNT           # Use another saved Keychain account.
+delta-wifi watch                         # Monitor without submitting credentials.
+delta-wifi watch --auto-login             # Monitor and recover automatically.
+delta-wifi watch --display log            # Scrolling text instead of the live panel.
+delta-wifi watch --json                   # Newline-delimited JSON for scripts.
 ```
 
-HTTP mode follows the observed production portal's Ping OAuth/PKCE flow, obtains an access token, and requests `freeWithSkyMiles` access for the current flight/device. It then checks both the provider's device policy and general-web access. This uses the portal's existing API, without DOM automation or browser cookies.
+You can start watch before boarding. It waits for DeltaWiFi.com, starts checks when the network appears, and returns to waiting when you leave. It does not join networks or probe unrelated SSIDs.
 
-- TLS verification stays enabled; requests are restricted to the exact `wifi.delta.com` and `signin.delta.com` HTTPS origins.
-- Flight/device identifiers are discovered live, never guessed or accepted from command-line arguments. The portal's device IP must match the laptop Wi-Fi IP before access changes.
-- Credentials are read from Keychain only when the identity service requests username/password authentication. At most one password submission occurs within a flow.
-- The portal's ordinary fresh-device information step is supported using a new ephemeral identifier. Stored fingerprints or other users' identities are never imitated.
-- Unknown authentication states, MFA, verification challenges, unexpected redirects, and rejected credentials stop the flow. Browser mode is an explicit alternative; there is no automatic browser fallback.
-- OAuth tokens, codes, flow/device identifiers, fingerprints, and cookies stay in memory and are never logged or persisted. Changing the account or leaving the network clears the identity context.
-- A temporary failure activating access can retry using the existing in-memory token without resubmitting the password. A broken connection after a password submission with an unknown outcome pauses password retries.
-- Existing premium access is preserved. If web checks fail while Delta still reports premium access, monitoring investigates the outage rather than repeatedly logging in.
-
-Use `--force` to request authentication/activation despite an existing access policy. The network, origin, device-IP, rejection, and retry safeguards still apply.
-
-The HTTP adapter is based on `main.c9a4c2346f166521.js` observed on 2026-10-30. These are undocumented provider interfaces and may change; unfamiliar schemas stop safely with an error. Browser mode remains available for unsupported flows.
-
-## Device logout for repeat testing
+### Enable quiet notifications
 
 ```sh
-delta-wifi logout --dry-run
-delta-wifi logout
-delta-wifi login YOUR_ACCOUNT
+delta-wifi notify-perms
+delta-wifi watch --auto-login --notify
 ```
 
-**Logout resets this laptop's onboard premium access to the portal's default/basic policy.** It does not invoke global SkyMiles logout, remove Keychain credentials, or change your Delta password. Success requires provider confirmation of a basic/default policy; losing a ping or failing a web check is not sufficient proof.
+Allow **Delta WiFi Alerts** when prompted. Notifications are queued when login needs attention or a sustained outage ends; routine retries stay quiet. Change the minimum outage duration with `--notify-after 120` (default: 60 seconds).
 
-Run it while the laptop is connected to **DeltaWiFi.com**, not through the phone hotspot. Both the SSID and the server-reported device IP are checked to avoid changing the phone's session. `--dry-run` is read-only and does not pause recovery or submit a reset.
+### Review connection history
 
-Stop any in-progress login before testing logout. Actual logout sets a shared local recovery-pause flag so existing watch loops do not immediately undo it. An already-submitted operation cannot be recalled. Running `login` or restarting `watch --auto-login` explicitly resumes recovery. Monitor-only watch does not clear the pause.
+```sh
+delta-wifi history
+delta-wifi history --limit 100 --json
+delta-wifi history --clear
+```
 
-The reset POST is submitted once; it is not automatically retried if confirmation fails. Default verification time is 30 seconds, configurable with `--verify-timeout`. HTTP timeouts or an unrecognized policy produce an unconfirmed/error result rather than a false success. `--json` prints the result without flight/device identifiers.
+### Diagnose an ambiguous connection
 
-A successful logout and subsequent fresh HTTP-only login were validated by the user on a Delta flight on 2026-10-30. The fresh login recovered from an initial connection timeout, completed OAuth and access activation, and confirmed `DalPedPremium` plus general-web connectivity.
+```sh
+delta-wifi portal-info
+delta-wifi connectivity --samples 3 --json > connection-samples.json
+delta-wifi diagnose > diagnostic.json
+delta-wifi open-portal
+```
 
-## Optional browser mode
+`connectivity` works on any SSID, so you can compare a phone hotspot with Delta Wi-Fi. `portal-info` and the diagnostic commands do not read passwords or submit credentials. `open-portal` opens the system default browser for manual use. Review network/interface names before sharing diagnostics.
 
-The Homebrew package installs the HTTP core. To invoke the optional browser extra in an automatically managed environment:
+### Log out and test a fresh login
+
+Stop any in-progress login, stay connected to DeltaWiFi.com, then:
+
+```sh
+delta-wifi logout --dry-run               # Read-only device/IP checks.
+delta-wifi logout                         # Reset this laptop's onboard access.
+delta-wifi login                          # Authenticate again using HTTP.
+```
+
+Logout keeps Keychain credentials and resets only the matching laptop's onboard access, not your global Delta account. Do not run it through a phone hotspot: that is a different onboard connection, and the tool refuses it. Logout pauses existing recovery loops; `login` or restarting `watch --auto-login` explicitly resumes recovery.
+
+## Advanced
+
+### How access and connectivity are distinguished
+
+A successful ping or OS connectivity check does **not** prove a usable internet connection or an authenticated session. Captive portals can allow selected traffic before login.
+
+| Signal | Meaning |
+| --- | --- |
+| `Session: premium-access` | Delta's device-policy API reports `DalPedPremium` for an IP matching this laptop. It does not identify the SkyMiles account or prove internet access; other premium entitlements can use the same policy. |
+| `Session: login-required` | A known basic policy, form, or portal redirect suggests full access needs activation. |
+| `Session: unknown` | There is insufficient session evidence. |
+| `Internet: online` | At least two general-web checks passed, without a known Delta portal redirect. This is sampled access evidence, not proof every site works. |
+| `Internet: limited` | Some destinations respond, but there is insufficient general-web evidence. This never skips login inspection or announces recovery. |
+| `Internet: captive` | A redirect to a known Delta portal host was observed. |
+| `Internet: unavailable` | None of the sampled destinations passed. |
+| `Internet: network-changed` | The SSID or local IP changed during the checks; the sample was discarded. |
+
+General-web checks use Cloudflare, Wikipedia, and Python.org; Apple/Google OS checks are reported separately. Requests use fresh URLs, no-cache headers, and expected status/content checks. Up to three same-origin HTTPS redirects are followed. A normal canonical redirect is not captive evidence. `captive_evidence: false` does not mean authenticated: a restricted network may reset or time out HTTPS instead of redirecting it.
+
+Network diagnostics include local IPv4 address, scoped gateway/ICMP, system DNS, representative IPv4/IPv6 routes, connected VPN indicators, and proxy configuration. A gateway reply confirms only ICMP reachability; no reply can mean filtering. DNS `working` means all sampled names resolve, `partial` means some do, and `failed` means none do.
+
+A detected VPN service does not prove a sampled request used its tunnel. Route snapshots do not bind traffic to Wi-Fi or detect every per-app/split-tunnel behavior. Alternate routes or configured proxies suspend automatic login rather than producing a misleading success. External DNS failures do not prevent login if the portal remains reachable. The tool never changes network settings, reconnects Wi-Fi, or disables a VPN.
+
+### HTTP authentication and retry behavior
+
+The HTTP adapter follows the observed production portal's Ping OAuth/PKCE flow, obtains an access token, and requests `freeWithSkyMiles` access for the current flight/device. Both the provider policy and general-web access are then verified.
+
+- TLS verification stays enabled. Requests are restricted to the exact `wifi.delta.com` and `signin.delta.com` HTTPS origins.
+- Flight/device identifiers are discovered live, not guessed or supplied on the command line. The server-reported device IP must match the laptop Wi-Fi IP before access changes.
+- Keychain is read only when the identity service requests credentials. At most one password submission occurs within a flow.
+- The ordinary fresh-device information step uses a new ephemeral identifier; stored fingerprints or other users' identities are not imitated.
+- OAuth tokens, codes, cookies, fingerprints, and flow/device identifiers stay in memory. They are not logged or persisted; leaving the network or changing accounts clears the identity context.
+- Unknown states, MFA, verification challenges, unexpected redirects, and rejected credentials stop the flow. There is no automatic browser fallback.
+- Default recovery limit: three failed attempts, with exponential backoff and jitter starting at 30 seconds. A temporary activation failure can reuse an in-memory token without resubmitting the password.
+- A broken connection after a password submission with an unknown outcome pauses password retries. Three fully online observations reset a temporary attempt limit; user-action errors require resolving the issue and starting login/watch again.
+- Existing premium access is preserved during upstream outages rather than repeatedly reauthenticated.
+
+```sh
+delta-wifi watch --auto-login --max-attempts 3 --retry-delay 30 --interval 20
+delta-wifi login --verify-timeout 120
+delta-wifi login --force
+```
+
+`--force` requests login/activation even when access already exists; it retains network, origin, device-IP, rejection, and retry safeguards. The default post-submit verification window is 90 seconds; individual network checks add time.
+
+These are undocumented provider interfaces, based on `main.c9a4c2346f166521.js` observed on 2026-10-30. They may change. Unfamiliar schemas stop with an error; browser mode is an explicit alternative for unsupported flows.
+
+### Optional browser mode
+
+The Homebrew package installs the HTTP core. To invoke the browser extra in an automatically managed environment, using [uv](https://docs.astral.sh/uv/):
 
 ```sh
 uvx --from 'delta-wifi[browser] @ git+https://github.com/chiesennegs/delta-wifi.git@v0.3.0' delta-wifi login --mode browser --browser canary
 ```
 
-For a source/development installation, install the browser extra into that environment:
+For a source/development installation:
 
 ```sh
 python -m pip install -e '.[browser]'
@@ -95,117 +200,53 @@ delta-wifi watch --auto-login --mode browser --browser canary
 delta-wifi portal-info --mode browser --browser canary
 ```
 
-Production browser mode uses Google Chrome installed in `/Applications`; development can select Chrome Canary. It launches a separate temporary profile, without using your personal browser profile. `--browser` only selects the application; it does not enable browser mode. `--headless` applies only with `--mode browser`.
+Browser mode uses Google Chrome in `/Applications`, or Chrome Canary when selected. It launches a separate temporary profile. `--browser` chooses the application but does not enable browser mode; `--headless` applies only with `--mode browser`.
 
-The browser adapter opens the observed SkyMiles dialog and submits its recognized fields. During a post-login video, it selects a unique visible, enabled **Skip** control: an accessible button first, then the observed `div.content-container` containing exactly “Skip.” Angular-generated attributes are not used. A click counts as effective only when the control disappears; an ignored early click can be retried later. It does not modify video positions, countdowns, disabled states, or hidden UI. No terms, CAPTCHAs, or verification challenges are automatically completed.
+The adapter submits the recognized SkyMiles dialog. During a post-login video, it can select a unique visible, enabled **Skip** button or the observed `div.content-container` containing exactly “Skip.” It does not rely on Angular-generated attributes. An ignored click can be retried later; video positions, countdowns, disabled states, and hidden UI are not modified. Terms, CAPTCHAs, and verification challenges are not automatically completed.
 
-Both modes exit once their required access verification succeeds. HTTP mode does not launch or interact with a video UI. Browser mode can exit while a video remains if general-web access is already available. The default post-submit verification window is 90 seconds; individual network checks add time.
+Both modes exit when their required verification succeeds. HTTP mode never loads a video UI. Browser mode can exit while video remains if general-web access is available. Actual Skip handling still needs live validation.
 
-```sh
-delta-wifi login --verify-timeout 120
-delta-wifi login --mode browser --browser canary --verify-timeout 120
-```
-
-Browser login was validated by the user on a flight. Actual Skip-control handling has synthetic tests and still needs live validation.
-
-## Monitoring, waiting, and terminal display
+### Saved accounts, private state, and history
 
 ```sh
-delta-wifi status
-delta-wifi watch
-delta-wifi watch --auto-login
-delta-wifi watch --display log
-delta-wifi watch --display panel
-delta-wifi watch --json
-```
-
-Start watch before boarding if useful. It waits for `DeltaWiFi.com`, starts checks when the network appears, and returns to waiting when you leave. It does not join networks. Monitoring does not probe unrelated SSIDs.
-
-A terminal automatically gets a compact updating panel: Wi-Fi, provider/session evidence, internet, gateway, DNS, route/VPN/proxy evidence, last verified web access, outage duration, failed recovery attempts, next action, and countdown. Ctrl+C restores the terminal and clears in-memory identity state. The countdown covers the interval between checks; check execution adds time.
-
-Piped output uses scrolling text. `--json` always disables the panel and emits newline-delimited status, recovery, and next-check events. Last verified general-web access is retained across runs; older timestamps recorded under the weaker partial-access policy are ignored.
-
-Retry defaults: up to three failed recovery attempts, with exponential backoff and jitter starting at 30 seconds. Rejected credentials, rate limits, challenges, and uncertain post-password outcomes pause attempts while monitoring continues. Three fully online observations reset a temporary attempt limit; errors requiring user action need resolution and a new explicit login/watch invocation.
-
-## Saved account and Keychain
-
-```sh
-delta-wifi credentials YOUR_ACCOUNT
-delta-wifi credentials
-delta-wifi account
-delta-wifi account use OTHER_ACCOUNT
-delta-wifi account forget
+delta-wifi credentials                   # Update the preferred account's password.
+delta-wifi account                       # Inspect account/Keychain entry availability.
+delta-wifi account use OTHER_ACCOUNT     # Select an existing entry without reading its password.
+delta-wifi account forget                # Remove the preferred local entry/preference.
 delta-wifi account forget OTHER_ACCOUNT
 ```
 
-The credentials command privately prompts for the password, updates its Keychain entry, and remembers the preferred account. Passwords are never passed as command-line arguments. Account inspection checks entry availability without reading the password. Forget removes local credentials and the matching preference only; it does not log out an onboard session.
+Passwords are never passed as command-line arguments. Account inspection does not read them. An explicit account overrides the preference for that invocation. Forget removes local credentials and the matching preference; it does not log out an onboard session.
 
-`login` and `watch --auto-login` use the preferred account if ACCOUNT is omitted. An explicit account overrides it for that invocation. The preferred username is stored privately as a preference, not in event history.
+Preferences and history live under `~/Library/Application Support/delta-wifi`, with private directory/database permissions. The preferred username is stored as a preference, not in event history. History retains up to 5,000 state changes, outage events, recovery attempts, password-submission events, results, durations, logout results, and watch starts/stops. Events exclude usernames, passwords, SSIDs, IPs, cookies, tokens, HTML, and request payloads.
 
-## Connection history
+`history --clear` retains account, last-access, and recovery-pause preferences. Durations use a monotonic clock; leaving a network or stopping watch marks an outage as interrupted rather than recovered. Last verified access survives restarts; timestamps from the older partial-access policy are ignored. `DELTA_WIFI_STATE_DIR` can isolate tests; use a dedicated directory because the tool applies private permissions to it.
 
-```sh
-delta-wifi history
-delta-wifi history --limit 100 --json
-delta-wifi history --clear
-```
+The terminal panel updates in place. Piped output uses scrolling text. JSON emits newline-delimited status, recovery, and next-check events. Ctrl+C restores the terminal and clears in-memory identity state. Countdown time excludes check execution.
 
-A private local SQLite database retains up to 5,000 events: connection changes, outage starts/ends/interruptions, recovery attempts, actual password submissions, results, durations, logout results, and watch starts/stops. Events exclude usernames, passwords, SSIDs, IP addresses, cookies, tokens, HTML, and request payloads.
+### Logout and notification details
 
-State lives under `~/Library/Application Support/delta-wifi`, with a private directory and database permissions. `--clear` removes history while retaining account, last-access, and recovery-pause preferences. Latest events are displayed chronologically; JSON is an array. Leaving a network or stopping watch marks an ongoing outage as interrupted rather than recovered. `DELTA_WIFI_STATE_DIR` can isolate tests; use a directory dedicated to this tool because private permissions are applied to it.
+Logout sends one reset request and requires provider confirmation of basic/default policy. Failed web checks alone do not establish logout. The reset is not automatically retried if confirmation fails. Default verification time is 30 seconds, configurable with `--verify-timeout`; `--json` excludes device/flight identifiers. An already-submitted login cannot be recalled, so stop in-progress login work before testing logout.
 
-## Notifications
+The notification helper is separate from Wi-Fi authorization. Homebrew supplies it precompiled; source installations build it on first permission setup. Brief outages and routine retries stay quiet. Partial access never triggers a recovery notification. Notification failures do not stop monitoring; macOS Focus and notification settings control whether queued alerts are displayed.
 
-```sh
-delta-wifi notify-perms
-delta-wifi watch --auto-login --notify
-delta-wifi watch --auto-login --notify --notify-after 120
-```
+### Permissions and troubleshooting
 
-Allow **Delta WiFi Alerts** notification access. It is a separate helper and does not rebuild the Wi-Fi helper or change Location Services authorization. This checkout includes the compiled helper; new installations build it on first use.
+If Wi-Fi authorization was denied, enable **Delta WiFi Helper** in System Settings > Privacy & Security > Location Services. If macOS still hides the SSID, first confirm DeltaWiFi.com in the Wi-Fi menu, then use `--assume-delta`. It requires a Wi-Fi IP, cannot override a known different SSID, and never bypasses the server device-IP check. Stop watch before changing networks with that override.
 
-Routine monitoring/retries stay quiet. An alert is queued once when login needs attention and once when an outage lasting at least 60 seconds (configurable) ends. Partial internet access never triggers recovery notification. A delivery failure does not stop monitoring. macOS Focus and notification settings control whether queued alerts are shown.
+Default `portal-info` reports safe provider-policy/adapter metadata over HTTP. Browser mode instead reports login field counts and closes. Diagnostics do not read Keychain or submit credentials. `diagnose` includes local addresses and network/interface names; review before sharing. Connectivity reports omit bodies, public IPs from trace responses, cookies, request payloads, and query strings.
 
-## Diagnostics and access evidence
+If a browser quits before opening a page, the adapter pauses. The development environment has aborted separate Chrome/Canary processes during macOS application registration; run browser tests from your own Terminal rather than repeatedly relaunching from the agent environment. No browser security settings need changing.
 
-```sh
-delta-wifi portal-info
-delta-wifi diagnose > diagnostic.json
-delta-wifi connectivity --json > connection-sample.json
-delta-wifi connectivity --samples 3 --json > repeated-samples.json
-delta-wifi open-portal
-```
-
-Default `portal-info` is HTTP-only and reports safe provider-policy/adapter metadata. Browser mode instead reports login field counts and closes afterward. Neither reads Keychain or submits credentials. `open-portal` opens the system default browser for manual use.
-
-`connectivity` works on any SSID, so it can compare a hotspot with unauthenticated Delta Wi-Fi. Reports contain endpoint HTTP status, timing, expected-content result, safe error class/errno, redirect hosts, SSID before/after, and route/VPN/proxy evidence. A change of SSID or local IP during a sample invalidates it. Bodies, public IPs from trace responses, cookies, request payloads, and query strings are excluded. Review SSID/interface names before sharing.
-
-Access evidence is intentionally separate:
-
-- `Session: premium-access` means Delta's device-policy API reports `DalPedPremium` for an IP matching this laptop. It does not identify the SkyMiles account or prove general internet access. A paid or other premium entitlement can use the same policy.
-- `Session: login-required` means a known basic policy, form, or portal-redirect evidence suggests full access needs activation. `unknown` means evidence is insufficient.
-- Internet `online` requires at least two general-web checks to pass, without a known Delta portal redirect. It is sampled access evidence, not proof every site is reachable.
-- Internet `limited` means some destinations respond without enough general-web evidence. OS connectivity checks and ICMP can pass before authentication; they never establish success alone.
-- `captive` means a redirect to a known Delta portal host was observed. `captive_evidence: false` does not mean authenticated: a restricted network may reset or time out HTTPS instead of redirecting it.
-- General-web checks use Cloudflare, Wikipedia, and Python.org (a small robots.txt response). Apple/Google OS checks are reported separately. Fresh URLs, no-cache headers, expected content/status, and bounded same-origin HTTPS redirects reduce ambiguity. Normal canonical redirects are not captive evidence.
-
-Network diagnostics include Wi-Fi association, local IPv4 address, scoped gateway/ICMP, system DNS, representative IPv4/IPv6 routes, connected VPN indicators, and system/environment proxy configuration. A gateway ping reply confirms only that reply; no reply may indicate ICMP filtering. DNS `working` means all sampled names resolve; `partial` means some; `failed` means none. A detected VPN service alone does not prove a sampled request used its tunnel.
-
-A route snapshot does not bind application traffic to Wi-Fi and cannot detect every split-tunnel or per-app VPN behavior. Alternate routes or a configured proxy suspend automatic login rather than producing a misleading success. If external DNS fails but the portal responds, login can still be attempted. The tool never changes network settings, reconnects Wi-Fi, or disables VPNs.
-
-If macOS hides the SSID, confirm DeltaWiFi.com in the Wi-Fi menu before using `--assume-delta`. It requires a Wi-Fi IP, cannot override a known different SSID, and never bypasses the portal device-IP check. Stop watch before changing networks with that override.
-
-## Testing and live validation
+### Development, validation, and releases
 
 ```sh
 python -m unittest discover -s tests -v
 DELTA_WIFI_BROWSER_TESTS=1 python -m unittest discover -s tests -v
 ```
 
-Regular tests use synthetic HTTP OAuth/access-reset responses, network states, sanitized onboard captures, temporary storage, and mocked Keychain/notification operations. They cover device binding, PKCE, unsupported challenges, no credential redirects, token reuse after activation errors, uncertain password POSTs, recovery suspension after logout, and cleanup on leaving/rejoining a network.
+Regular tests use synthetic HTTP flows, network states, sanitized onboard captures, temporary storage, and mocked Keychain/notification operations. Browser tests use intercepted synthetic pages with fake credentials, making no Delta requests.
 
-The user validated browser login, device logout, and a fresh HTTP-only login with a transient-failure retry on 2026-10-30. General-web classification was checked against working hotspot and unauthenticated Delta captures. Live behavior on every aircraft/provider is not assumed.
+Browser login, device logout, and fresh HTTP-only login with a transient-failure retry were validated on a Delta flight on 2026-10-30. Classification was checked against working-hotspot and unauthenticated-Delta captures. This does not establish behavior on every aircraft/provider. Notification helpers compile/sign successfully; their permission prompt and delivery still need user validation.
 
-Opt-in browser tests launch Canary against synthetic intercepted pages with fake credentials, making no Delta requests. The development environment aborts separate Chrome/Canary launches during macOS app registration, so run these from your own Terminal. If a browser quits before opening a page, the adapter pauses; do not repeatedly relaunch it from the agent environment. No browser security changes are required.
-
-The notification helper compiles/signs successfully; its permission prompt and delivery still need user validation. The original Wi-Fi helper remains unchanged.
+For publishing, see the [Homebrew release guide](packaging/HOMEBREW.md). It covers version tags, GitHub's draft-release build, checksums, the [tap](https://github.com/chiesennegs/homebrew-tap), recipe updates, and signing status. CI verifies the universal helpers, an isolated installation, and an actual Homebrew installation before drafting a release.
