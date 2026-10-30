@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "delta-wifi"
+version = "0.3.0"
+description = "Observe and recover Delta inflight Wi-Fi connections on macOS"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+browser = ["playwright>=1.40,<2"]
+
+[project.scripts]
+delta-wifi = "delta_wifi.cli:main"
+
+[tool.setuptools.package-data]
+delta_wifi = ["native/*.swift"]
+
+[tool.setuptools.packages.find]
+include = ["delta_wifi*"]

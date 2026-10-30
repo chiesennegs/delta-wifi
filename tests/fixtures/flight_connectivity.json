@@ -1,0 +1,218 @@
+[
+  {
+    "case": "hotspot-1",
+    "expected": "online",
+    "probes": [
+      {
+        "name": "apple-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "google-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 204
+      },
+      {
+        "name": "cloudflare-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "wikipedia-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "python-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      }
+    ]
+  },
+  {
+    "case": "hotspot-2",
+    "expected": "online",
+    "probes": [
+      {
+        "name": "apple-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "google-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 204
+      },
+      {
+        "name": "cloudflare-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "wikipedia-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "python-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      }
+    ]
+  },
+  {
+    "case": "hotspot-3",
+    "expected": "online",
+    "probes": [
+      {
+        "name": "apple-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "google-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 204
+      },
+      {
+        "name": "cloudflare-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      },
+      {
+        "name": "wikipedia-web",
+        "purpose": "general-web",
+        "result": "timeout",
+        "status_code": 301
+      },
+      {
+        "name": "python-web",
+        "purpose": "general-web",
+        "result": "pass",
+        "status_code": 200
+      }
+    ]
+  },
+  {
+    "case": "delta-before-login-1",
+    "expected": "unavailable",
+    "probes": [
+      {
+        "name": "apple-check",
+        "purpose": "connectivity-check",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "google-check",
+        "purpose": "connectivity-check",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "cloudflare-web",
+        "purpose": "general-web",
+        "result": "connection-error",
+        "status_code": null
+      },
+      {
+        "name": "wikipedia-web",
+        "purpose": "general-web",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "python-web",
+        "purpose": "general-web",
+        "result": "connection-error",
+        "status_code": null
+      }
+    ]
+  },
+  {
+    "case": "delta-before-login-2",
+    "expected": "limited",
+    "probes": [
+      {
+        "name": "apple-check",
+        "purpose": "connectivity-check",
+        "result": "connection-error",
+        "status_code": null
+      },
+      {
+        "name": "google-check",
+        "purpose": "connectivity-check",
+        "result": "pass",
+        "status_code": 204
+      },
+      {
+        "name": "cloudflare-web",
+        "purpose": "general-web",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "wikipedia-web",
+        "purpose": "general-web",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "python-web",
+        "purpose": "general-web",
+        "result": "timeout",
+        "status_code": null
+      }
+    ]
+  },
+  {
+    "case": "delta-before-login-3",
+    "expected": "unavailable",
+    "probes": [
+      {
+        "name": "apple-check",
+        "purpose": "connectivity-check",
+        "result": "connection-error",
+        "status_code": null
+      },
+      {
+        "name": "google-check",
+        "purpose": "connectivity-check",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "cloudflare-web",
+        "purpose": "general-web",
+        "result": "connection-error",
+        "status_code": null
+      },
+      {
+        "name": "wikipedia-web",
+        "purpose": "general-web",
+        "result": "timeout",
+        "status_code": null
+      },
+      {
+        "name": "python-web",
+        "purpose": "general-web",
+        "result": "connection-error",
+        "status_code": null
+      }
+    ]
+  }
+]
