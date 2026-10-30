@@ -4,7 +4,7 @@ A macOS CLI for monitoring and recovering Delta inflight Wi-Fi. Login, retries, 
 
 ## Homebrew distribution
 
-The Homebrew packaging and release workflow are being prepared. Once the first tagged release and tap recipe are published:
+The first Homebrew pre-release is available:
 
 ```sh
 brew install chiesennegs/tap/delta-wifi
@@ -12,7 +12,7 @@ brew update
 brew upgrade delta-wifi
 ```
 
-This installs the HTTP core and precompiled native helpers without manual venv activation. See [the publishing guide](packaging/HOMEBREW.md) for repository setup, draft-release review, tap updates, signing status, and maintenance. The initial prebuilt helpers have development signatures; stable Developer ID signing/notarization is not yet configured.
+This installs the HTTP core and precompiled native helpers without manual venv activation. If migrating from an active development venv, run `deactivate` first, then run `delta-wifi wifi-perms` once after installing. See [the publishing guide](packaging/HOMEBREW.md) for repository setup, draft-release review, tap updates, signing status, and maintenance. The initial prebuilt helpers have development signatures; stable Developer ID signing/notarization is not yet configured.
 
 ## Setup from source
 
@@ -78,6 +78,14 @@ The reset POST is submitted once; it is not automatically retried if confirmatio
 A successful logout and subsequent fresh HTTP-only login were validated by the user on a Delta flight on 2026-10-30. The fresh login recovered from an initial connection timeout, completed OAuth and access activation, and confirmed `DalPedPremium` plus general-web connectivity.
 
 ## Optional browser mode
+
+The Homebrew package installs the HTTP core. To invoke the optional browser extra in an automatically managed environment:
+
+```sh
+uvx --from 'delta-wifi[browser] @ git+https://github.com/chiesennegs/delta-wifi.git@v0.3.0' delta-wifi login --mode browser --browser canary
+```
+
+For a source/development installation, install the browser extra into that environment:
 
 ```sh
 python -m pip install -e '.[browser]'

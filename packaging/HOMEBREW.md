@@ -1,5 +1,7 @@
 # Publishing delta-wifi with Homebrew
 
+The repositories and first pre-release, `v0.3.0`, are now published. The first-time setup sections below document the steps already completed. For the next release, use a new version such as `0.3.1`; do not recreate the existing tag.
+
 This project uses a **personal tap**, not Homebrew's central package repository. A tap is a normal GitHub repository holding a Ruby installation recipe. There is no submission or review process with the Homebrew maintainers for this route.
 
 Two public MIT repositories:
@@ -88,7 +90,7 @@ gh workflow run update.yml --repo chiesennegs/homebrew-tap -f version=0.3.0
 
 That workflow downloads the public release archive and generated formula, verifies the checksum/version/URL, and commits the recipe in the tap. Its own repository token can update the tap, so a separate cross-repository personal access token is unnecessary.
 
-Once it succeeds, the install command above is live. Run `brew test delta-wifi` after installing. The first actual Homebrew installation is an additional validation beyond the isolated wheel/helper smoke test.
+Once it succeeds, the install command above is live. Run `brew test delta-wifi` after installing. The release workflow also performs an actual Homebrew install/test on GitHub before drafting the release, in addition to the isolated wheel/helper smoke test.
 
 ## Subsequent releases
 
