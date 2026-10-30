@@ -29,6 +29,17 @@ jobs:
         run: python scripts/package_release.py --output dist
       - name: Verify a clean installation
         run: python scripts/smoke_release.py dist/delta-wifi-*-macos-universal.tar.gz
+      - name: Test an actual Homebrew installation from the local release asset
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: '1'
+          HOMEBREW_NO_INSTALL_CLEANUP: '1'
+        run: |
+          brew tap-new --no-git chiesennegs/release-smoke
+          TAP_PATH="$(brew --repository)/Library/Taps/chiesennegs/homebrew-release-smoke"
+          ARCHIVE_URL="$(python -c 'from pathlib import Path; print(next(Path("dist").glob("*-macos-universal.tar.gz")).resolve().as_uri())')"
+          python scripts/render_formula.py --repo "$GITHUB_REPOSITORY" --archive dist/delta-wifi-*-macos-universal.tar.gz --url "$ARCHIVE_URL" --output "$TAP_PATH/Formula/delta-wifi.rb"
+          brew install chiesennegs/release-smoke/delta-wifi
+          brew test chiesennegs/release-smoke/delta-wifi
       - name: Generate the Homebrew formula from the actual archive
         run: python scripts/render_formula.py --repo "$GITHUB_REPOSITORY" --archive dist/delta-wifi-*-macos-universal.tar.gz --output dist/delta-wifi.rb
       - run: ruby -c dist/delta-wifi.rb
